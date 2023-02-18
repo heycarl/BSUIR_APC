@@ -1,0 +1,3 @@
+[submodule "grvt_logger"]
+	path = grvt_logger
+	url = https://github.com/gravity-production/grvt_logger.git
