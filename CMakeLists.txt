@@ -10,6 +10,9 @@ set(Sources_1
         LAB_01/main.cpp
         grvt_logger/logger.hpp
         grvt_logger/logger.cpp)
+
+set(Sources_3
+        LAB_03/main.cpp)
 add_executable(LAB_01
         ${Sources_1})
 
@@ -21,6 +24,9 @@ add_executable(LAB_02
 
 target_include_directories(LAB_02 PRIVATE
         "C:\\Users\\Alexandr\\Documents\\CODE\\BSUIR\\_GRADE2\\_SEMESTER4\\APC\\BC\\INCLUDE")
+
+add_executable(LAB_03
+        ${Sources_3})
 
 # define build type
 if (CMAKE_BUILD_TYPE MATCHES Debug)

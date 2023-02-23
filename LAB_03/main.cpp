@@ -7,14 +7,14 @@
 #include <conio.h>
 #include <dos.h>
 
-unsigned int notes[] = { 196,261,329,196,261,329,196,261,329 };
+unsigned int freqs_to_play[] = { 196,261,329,196,261,329,196,261,329 };
 unsigned int note_delay = 400;
 
-void PlaySound();
-void StateWords();
+void play_freqs();
+void print_state();
 void char_to_bin(unsigned char state, char* str);
 void set_speaker(int is_active);
-void SetCount(int freq);
+void set_freq(int freq);
 void Menu();
 
 int main() {
@@ -25,9 +25,9 @@ int main() {
 void Menu() {
 	int choice = 0;
 	while (1) {
-		printf("1 - Play sound\n");
-		printf("2 - Print channels state words\n");
-		printf("0 - Exit\n\n");
+		printf("1 Buzzer check\n");
+		printf("2 Chanel states\n");
+		printf("0 Quit\n\n");
 
 		printf("Enter option: ");
 		scanf("%d", &choice);
@@ -35,12 +35,10 @@ void Menu() {
 		case 0:
 			return;
 		case 1:
-			PlaySound();
+			play_freqs();
 			break;
 		case 2:
-			StateWords();
-			printf("\n\nPress any key to continue: ");
-			scanf("%d", &choice);
+			print_state();
 			break;
 		default:
 			return;
@@ -49,7 +47,7 @@ void Menu() {
 }
 
 //функция считывающая слова состояния каналов
-void StateWords()
+void print_state()
 {
 	char* bin_state;
 	int iChannel;
@@ -60,23 +58,21 @@ void StateWords()
 		printf("Memory allocation error");
 		exit(EXIT_FAILURE);
 	}
-
+	// https://www.frolov-lib.ru/books/bsp.old/v33/ch5.htm
 	outp(0x43, 0xE2);       //заносим управляющее слово, соответствующее команде RBC (Чтение состояния канала) и номеру канала 0
 	state = inp(0x40);      //чтение слова состояния канала 0
 	char_to_bin(state, bin_state);
 	printf("Channel 0x40 state: %s\n", bin_state);
 
 	bin_state[0] = '\0';
-	outp(0x43, 0xE4);       //заносим управляющее слово,
-	//соответствующее команде RBC (Чтение состояния канала) и номеру канала 1
-	state = inp(0x41);      //чтение слова состояния канала 1
+	outp(0x43, 0xE4);
+	state = inp(0x41);
 	char_to_bin(state, bin_state);
 	printf("Channel 0x41 state: %s\n", bin_state);
 
 	bin_state[0] = '\0';
-	outp(0x43, 0xE8);       //заносим управляющее слово,
-	//соответствующее команде RBC (Чтение состояния канала) и номеру канала 2
-	state = inp(0x42);      //чтение слова состояния канала 2
+	outp(0x43, 0xE8);
+	state = inp(0x42);
 	char_to_bin(state, bin_state);
 	printf("Channel 0x42 state: %s\n", bin_state);
 
@@ -99,10 +95,11 @@ void char_to_bin(unsigned char state, char* str)
 }
 
 //функция установки значения счетчика
-void SetCount(int freq) {
+void set_freq(int freq) {
 	long base_freq = 1193180;  // внутренняя частота таймера
 	long calculated_freq;
-	outp(0x43, 0b10110110);     //запись в регистр канала канал 2, операция 4, режим работы 3, формат 0
+	outp(0x43, 0xB6);     //запись в регистр канала канал 2, операция 4, режим работы 3, формат 0
+	// 0b10110110
 
 	// формат:
 	// bit0   State
@@ -140,19 +137,31 @@ void SetCount(int freq) {
 
 //функция работы с громкоговорителем
 void set_speaker(int is_active) {
+
+//	7	RAM parity error occurred
+//	6	I/O channel parity error occurred
+//	5	mirrors timer 2 output condition
+//	4	toggles with each refresh request
+//	3	NMI I/O channel check status
+//	2	NMI parity check status
+//	1	speaker data status
+//	0	timer 2 clock gate to speaker status
+
 	if (is_active) {
 		outp(0x61, inp(0x61) | 0x3);    //устанавливаем 2 младших бита в порте динаминка 11
+		// 0b00000011
 		return;
 	} else {
 		outp(0x61, inp(0x61) & 0xFC);   //устанавливаем 2 младших бита в порте динаминка 00
+		// 0x11111100
 		return;
 	}
 }
 
 //функция воспроизведения песни
-void PlaySound() {
-	for (int i = 0; i < sizeof(notes) / sizeof (unsigned int); i++) {
-		SetCount(notes[i]);
+void play_freqs() {
+	for (int i = 0; i < sizeof(freqs_to_play) / sizeof (unsigned int); i++) {
+		set_freq(freqs_to_play[i]);
 		set_speaker(1);    //включаем громкоговоритель
 		delay(note_delay);         //устанавливаем длительность мс
 		set_speaker(0);    //выключаем громкоговоритель
