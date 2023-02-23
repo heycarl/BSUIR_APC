@@ -191,6 +191,8 @@ void initialize()
 	_disable(); // CLI
 
 	// interrupt init for Master
+	//   0    0      0      1      0      0      0      1
+	//                          tr Md  int Sze  use SL  use ICW4
 	outp(0x20, 0x11);	//ICW1 - initialize master
 	outp(0x21, 0x80);   //ICW2 - base vector for master
 	outp(0x21, 0x04);	//ICW3 - the port bit of Slave (in binary format)
@@ -211,10 +213,11 @@ int main()
 	initialize();
 	system("cls");
 
-	printf("                   - mask\n");
-	printf("                   - prepare\n");
-	printf("                   - service\n");
-	printf("Master  | Slave\n");
+	printf("                   - mask    |\n");
+	printf("                   - prepare |\n");
+	printf("                   - service |\n");
+	printf("Master  | Slave              |\n");
+	printf("_____________________________|\n");
 
 	FP_SEG(fp) = _psp; //получаем сегмент
 	FP_OFF(fp) = 0x2c; //получаем смещение сегмента данных с переменными среды
