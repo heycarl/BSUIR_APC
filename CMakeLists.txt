@@ -13,6 +13,10 @@ set(Sources_1
 
 set(Sources_3
         LAB_03/main.cpp)
+
+set(Sources_4
+        LAB_04/main.cpp)
+
 add_executable(LAB_01
         ${Sources_1})
 
@@ -27,6 +31,9 @@ target_include_directories(LAB_02 PRIVATE
 
 add_executable(LAB_03
         ${Sources_3})
+
+add_executable(LAB_04
+        ${Sources_4})
 
 # define build type
 if (CMAKE_BUILD_TYPE MATCHES Debug)
