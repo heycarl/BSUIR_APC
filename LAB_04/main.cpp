@@ -12,7 +12,7 @@ int ms;
 
 char data[CMOS_TIME_COUNT];
 void interrupt (*__timer_handler_sys)(...);
-
+void interrupt (*__alarm_handler_sys)(...);
 unsigned char convert_to_dec(int value);
 unsigned char convert_to_bcd(int value);
 
@@ -85,6 +85,7 @@ void refresh_time();
 void print_time();
 void set_time();
 void make_delay(unsigned int ms);
+void set_alarm();
 void enter_new_time();
 void change_freq();
 
@@ -127,6 +128,21 @@ void change_freq(){
 	printf("\nchanged frequency %X \n", bin);
 }
 
+void interrupt __new_alarm_handler(...)
+{
+	outp(0x70, RTC_STATE_C);
+	if (inp(0x71) & 0x20) {
+		puts("ALARM!!!\n");
+	}
+	outp(0x20, 0x20);
+	outp(0x0A, 0x20);
+	disable(); // CLI
+	setvect(0x70, __alarm_handler_sys);
+	enable(); // STI
+	outp(0x70, RTC_STATE_B);
+	outp(0x71, (inp(0x71) & 0xDF));
+}
+
 void interrupt __new_timer_handler(...)
 {
 	outp(0x70, RTC_STATE_C);
@@ -163,7 +179,8 @@ int main()
 		printf("2 set time\n");
 		printf("3 set delay\n");
 		printf("4 change freq\n");
-		printf("5 exit\n");
+		printf("5 set alarm\n");
+		printf("6 exit\n");
 		switch (getch())
 		{
 			case '1':
@@ -183,9 +200,14 @@ int main()
 				make_delay(ms);
 				break;
 			case '4':
+				system("cls");
 				change_freq();
 				break;
 			case '5':
+				system("cls");
+				set_alarm();
+				break;
+			case '6':
 				system("cls");
 				return 0;
 			default:
@@ -278,6 +300,24 @@ void make_delay(unsigned int ms)
 	enable(); // STI
 	outp(0x70, RTC_STATE_B);
 	outp(0x71, (inp(0x71) | 0x40));
+}
+
+void set_alarm()
+{
+	enter_new_time();
+	disable(); // CLI
+	__alarm_handler_sys = getvect(0x70);
+	setvect(0x70, __new_alarm_handler);
+	outp(0xA1, (inp(0xA0) & 0xFE));
+	int alarm_cmos[] = { RTC_CURRENT_ALARM_SEC, RTC_CURRENT_ALARM_MIN, RTC_CURRENT_ALARM_HOUR };
+	for (int i = 0; i < 3; i++) {
+		outp(0x70, alarm_cmos[i]);
+		outp(0x71, data[i]);
+	}
+	enable(); // STI
+	outp(0x70, 0x0B);
+	outp(0x71, inp(0x71) | 0x20);
+	puts("Alarm enabled!\n");
 }
 
 int get_value_in_range(int low, int high, char* const instruct)
