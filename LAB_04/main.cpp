@@ -16,6 +16,9 @@ void interrupt (*__alarm_handler_sys)(...);
 unsigned char convert_to_dec(int value);
 unsigned char convert_to_bcd(int value);
 
+#define RTC_ALLOW_FLAG 0x80     // 1000 0000
+#define RTC_DISALLOW_MASK 0x7f  // 0111 1111
+
 #define RTC_CURRENT_SEC 0x00
 //00h: RTC — текущая секунда (00 – 59h или 00 – 3Bh) — формат выбирается регистром 0Bh, по умолчанию — BCD
 
@@ -93,20 +96,20 @@ void change_freq(){
 	int freq;
 	int q;
 	int bin;
-	puts("select frequency: ");
-	puts("1 2 hertz");
-	puts("2 4 hertz");
-	puts("3 8 hertz");
-	puts("4 16 hertz");
-	puts("5 32 hertz");
-	puts("6 64 hertz");
-	puts("7 128 hertz");
-	puts("8 256 hertz");
-	puts("9 512 hertz");
-	puts("10 1024 hertz");
-	puts("11 2048 hertz");
-	puts("12 4096 hertz");
-	puts("13 8192 hertz");
+	printf("select frequency: \n");
+	printf("1 2 hertz\n");
+	printf("2 4 hertz\n");
+	printf("3 8 hertz\n");
+	printf("4 16 hertz\n");
+	printf("5 32 hertz\n");
+	printf("6 64 hertz\n");
+	printf("7 128 hertz\n");
+	printf("8 256 hertz\n");
+	printf("9 512 hertz\n");
+	printf("10 1024 hertz\n");
+	printf("11 2048 hertz\n");
+	printf("12 4096 hertz\n");
+	printf("13 8192 hertz\n");
 	scanf("%d", &q);
 	freq = 0x0F - q + 1;
 
@@ -115,24 +118,91 @@ void change_freq(){
 	printf("frequency set before %X \n", bin);
 
 	outp(0x70, RTC_STATE_A);
-	outp(0x71, inp(0x71) | 0x80); // 1000 0000 (forbid to change)
+	outp(0x71, inp(0x71) & RTC_DISALLOW_MASK); // 1000 0000 (disallow to change)
 
 	outp(0x70, RTC_STATE_A);
 	outp(0x71, inp(0x71) & (0x20 + freq)); // 0010 0000 + freq
 
 	outp(0x70, RTC_STATE_A);
-	outp(0x71, inp(0x71) & 0x7f); // 0111 1111 (allow to change)
+	outp(0x71, inp(0x71) | RTC_ALLOW_FLAG); // 0111 1111 (disallow to change)
 
 	outp(0x70, RTC_STATE_A);
 	bin = inp(0x71);  //00100110
 	printf("\nchanged frequency %X \n", bin);
 }
 
+void set_freq(int freq) {
+	long base_freq = 1193180;  // внутренняя частота таймера
+	long calculated_freq;
+	outp(0x43, 0xB6);     //запись в регистр канала канал 2, операция 4, режим работы 3, формат 0
+	// 0b10110110
+
+	// формат:
+	// bit0   State
+	//  0     Двочный
+	//  1     Двоично-десятичный
+
+	// режим работы:
+	// bit3 bit2 bit1   State
+	//  0    0    0     Генерация прерывания IRQ0 при установке счетчика в 0
+	//  0    0    1     Установка в режим ждущего мультивибратора
+	//  0    1    0     Установка в режим генератора импульсов
+	//  0    1    1     Установка в режим генератора прямоугольных импульсов
+	//  1    0    0     Установка в режим программно зависимого одновибратора
+	//  1    0    1     Установка в режим аппаратно-зависимого одновибратора
+
+	// тип операции:
+	// bit5 bit4   State
+	//  0    0     Команда блокировки счетчика
+	//  0    1     Чтение/запись только младшего байта
+	//  1    0     Чтение/запись только старшего байта
+	//  1    1     Чтение/запись младшего, а за ним старшего байта
+
+	// выбор канала:
+	// bit7 bit6   State
+	//  0    0     Выбор первого канала (0)
+	//  0    1     Выбор второго канала (1)
+	//  1    0     Выбор третьего канала (2)
+	//  1    1     Команда считывания значений из регистров каналов
+	calculated_freq = base_freq / freq;
+	outp(0x42, calculated_freq % 256); // младший байт делителя
+	calculated_freq /= 256;
+	outp(0x42, calculated_freq);       //старший байт делителя
+	return;
+}
+
+//функция работы с громкоговорителем
+void set_speaker(int is_active) {
+
+//	7	RAM parity error occurred
+//	6	I/O channel parity error occurred
+//	5	mirrors timer 2 output condition
+//	4	toggles with each refresh request
+//	3	NMI I/O channel check status
+//	2	NMI parity check status
+//	1	speaker data status
+//	0	timer 2 clock gate to speaker status
+
+	if (is_active) {
+		outp(0x61, inp(0x61) | 0x3);    //устанавливаем 2 младших бита в порте динаминка 11
+		// 0b00000011
+		return;
+	} else {
+		outp(0x61, inp(0x61) & 0xFC);   //устанавливаем 2 младших бита в порте динаминка 00
+		// 0x11111100
+		return;
+	}
+}
+
 void interrupt __new_alarm_handler(...)
 {
 	outp(0x70, RTC_STATE_C);
-	if (inp(0x71) & 0x20) {
-		puts("ALARM!!!\n");
+	if (inp(0x71) & 0x20) { // interrupt called because of RTC alarm
+//		printf("ALARM!!!\n");
+		set_freq(329);
+		set_speaker(1);    //включаем громкоговоритель
+		delay(500);         //устанавливаем длительность мс
+		set_speaker(0);    //выключаем громкоговоритель
 	}
 	outp(0x20, 0x20);
 	outp(0x0A, 0x20);
@@ -146,11 +216,11 @@ void interrupt __new_alarm_handler(...)
 void interrupt __new_timer_handler(...)
 {
 	outp(0x70, RTC_STATE_C);
-	if (inp(0x71) & 0x40) {
+	if (inp(0x71) & 0x40) { //0010 1000
 		delay_time++;
 	}
-	outp(0x20, 0x20);
-	outp(0xA0, 0x20);
+	outp(0x20, 0x20); // send EOI to Master Interrupt controller
+	outp(0xA0, 0x20); // send EOI to Slave Interrupt controller
 
 	if (delay_time == delay_ms) {
 		puts("End of delay\n");
@@ -268,16 +338,8 @@ void set_time()
 	enter_new_time();
 	disable(); // CLI
 	outp(0x70, RTC_STATE_B);
-//	бит 7: запрещено обновление часов (устанавливают перед записью новых значений в регистры даты и часов)
-//	бит 6: вызов периодического прерывания (IRQ8)
-//	бит 5: вызов прерывания при срабатывании будильника
-//	бит 4: вызов прерывания по окончании обновления времени
-//	бит 3: включена генерация прямоугольных импульсов
-//	бит 2: 1/0 — формат даты и времени двоичный/BCD
-//	бит 1: 1/0 — 24-часовой/12-часовой режим
-//	бит 0: автоматический переход на летнее время в апреле и октябре
 
-	outp(0x71, inp(0x71) & 0x7f); // запретить обновление часов
+	outp(0x71, inp(0x71) & RTC_DISALLOW_MASK); // запретить обновление часов
 	int time_cmos[] = { RTC_CURRENT_SEC, RTC_CURRENT_MIN, RTC_CURRENT_HOUR };
 
 	for (int i = 0; i < 3; i++) {
@@ -285,7 +347,7 @@ void set_time()
 		outp(0x71, data[i]);
 	}
 	
-	outp(0x71, inp(0x71) | 0x80); // разрешить обновление часов
+	outp(0x71, inp(0x71) | RTC_ALLOW_FLAG); // разрешить обновление часов
 	enable(); // STI
 }
 

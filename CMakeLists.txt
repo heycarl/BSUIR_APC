@@ -17,6 +17,9 @@ set(Sources_3
 set(Sources_4
         LAB_04/main.cpp)
 
+set(Sources_5
+        LAB_05/main.c)
+
 add_executable(LAB_01
         ${Sources_1})
 
@@ -34,6 +37,9 @@ add_executable(LAB_03
 
 add_executable(LAB_04
         ${Sources_4})
+
+add_executable(LAB_05
+        ${Sources_5})
 
 # define build type
 if (CMAKE_BUILD_TYPE MATCHES Debug)
